@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <title>问题流转系统</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        font-family: "Segoe UI", sans-serif;
+        color: #0f172a;
+      }
+      body {
+        margin: 0;
+        background: #f8fafc;
+      }
+      header {
+        background: #0f172a;
+        color: #fff;
+        padding: 1rem 2rem;
+      }
+      main {
+        padding: 2rem;
+        display: grid;
+        gap: 1.5rem;
+      }
+      section {
+        background: #fff;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 5px 20px rgba(15, 23, 42, 0.08);
+      }
+      h2,
+      h3 {
+        margin-top: 0;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 0.75rem;
+        font-size: 0.9rem;
+        font-weight: 600;
+        color: #475569;
+      }
+      input,
+      textarea,
+      select {
+        margin-top: 0.25rem;
+        padding: 0.6rem 0.75rem;
+        border: 1px solid #cbd5f5;
+        border-radius: 8px;
+        font-size: 0.95rem;
+        font-family: inherit;
+      }
+      textarea {
+        min-height: 100px;
+        resize: vertical;
+      }
+      button {
+        cursor: pointer;
+        border: none;
+        border-radius: 8px;
+        padding: 0.65rem 1.25rem;
+        font-weight: 600;
+        background: #2563eb;
+        color: #fff;
+        transition: opacity 0.2s ease;
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 0.6rem;
+        border-bottom: 1px solid #e2e8f0;
+        font-size: 0.9rem;
+      }
+      tr:hover {
+        background: #eff6ff;
+        cursor: pointer;
+      }
+      .hidden {
+        display: none;
+      }
+      .status-pill {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+      }
+      .pill-pending {
+        background: #fef3c7;
+        color: #92400e;
+      }
+      .pill-approved {
+        background: #dcfce7;
+        color: #15803d;
+      }
+      .pill-returned {
+        background: #fee2e2;
+        color: #b91c1c;
+      }
+      .history {
+        max-height: 200px;
+        overflow-y: auto;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.5rem;
+      }
+      .history-item {
+        font-size: 0.85rem;
+        border-bottom: 1px solid #e2e8f0;
+        padding: 0.35rem 0;
+      }
+      .history-item:last-child {
+        border-bottom: none;
+      }
+      .inline {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .muted {
+        color: #94a3b8;
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>问题工单流转系统</h1>
+    </header>
+    <main>
+      <section id="login-section">
+        <h2>登录</h2>
+        <form id="login-form" autocomplete="off">
+          <label>
+            用户名
+            <input name="username" required />
+          </label>
+          <label>
+            密码
+            <input type="password" name="password" required />
+          </label>
+          <button type="submit">登录</button>
+        </form>
+        <p class="muted">
+          预置账号：
+          <strong>pm_lead / pm123456</strong>，
+          <strong>dev_master / dev123456</strong>，
+          <strong>customer_zero / cust123456</strong>
+        </p>
+      </section>
+
+      <section id="dashboard-section" class="hidden">
+        <div class="inline">
+          <div>
+            <h2>欢迎，<span id="user-name"></span></h2>
+            <p class="muted">角色：<span id="user-role"></span></p>
+          </div>
+          <div class="inline">
+            <button id="refresh-btn" type="button">刷新列表</button>
+            <button id="logout-btn" type="button" style="background:#f97316">退出</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="create-section" class="hidden">
+        <h3>创建工单</h3>
+        <form id="create-form">
+          <label>
+            问题描述
+            <textarea name="problem_description" required></textarea>
+          </label>
+          <label>
+            发生时间
+            <input type="datetime-local" name="occurred_at" required />
+          </label>
+          <label>
+            发生地点
+            <input name="location" required />
+          </label>
+          <button type="submit">提交给开发</button>
+        </form>
+      </section>
+
+      <section id="list-section" class="hidden">
+        <h3>工单列表</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>描述</th>
+              <th>状态</th>
+              <th>更新时间</th>
+            </tr>
+          </thead>
+          <tbody id="issue-tbody"></tbody>
+        </table>
+      </section>
+
+      <section id="detail-section" class="hidden">
+        <h3 id="detail-title">工单详情</h3>
+        <div id="detail-content"></div>
+      </section>
+    </main>
+
+    <script>
+      const API_BASE = "http://localhost:8000";
+      const loginSection = document.getElementById("login-section");
+      const dashboardSection = document.getElementById("dashboard-section");
+      const createSection = document.getElementById("create-section");
+      const listSection = document.getElementById("list-section");
+      const detailSection = document.getElementById("detail-section");
+      const detailContent = document.getElementById("detail-content");
+      const issueTbody = document.getElementById("issue-tbody");
+      const loginForm = document.getElementById("login-form");
+      const createForm = document.getElementById("create-form");
+      const refreshBtn = document.getElementById("refresh-btn");
+      const logoutBtn = document.getElementById("logout-btn");
+      const userNameEl = document.getElementById("user-name");
+      const userRoleEl = document.getElementById("user-role");
+
+      let auth = JSON.parse(localStorage.getItem("auth") ?? "null");
+      let issues = [];
+      let selectedIssue = null;
+
+      const roleLabels = {
+        product_manager: "产品经理",
+        developer: "研发",
+        customer: "客户",
+      };
+
+      function setAuth(newAuth) {
+        auth = newAuth;
+        if (auth) {
+          localStorage.setItem("auth", JSON.stringify(auth));
+        } else {
+          localStorage.removeItem("auth");
+        }
+        updateUI();
+      }
+
+      function statusPill(state) {
+        const map = {
+          pending_developer: { cls: "pill-pending", text: "待开发" },
+          developer_approved: { cls: "pill-approved", text: "开发通过" },
+          returned: { cls: "pill-returned", text: "已退回" },
+          draft: { cls: "pill-pending", text: "草稿" },
+        };
+        const meta = map[state] ?? { cls: "pill-pending", text: state };
+        return `<span class="status-pill ${meta.cls}">${meta.text}</span>`;
+      }
+
+      async function api(path, options = {}) {
+        const headers = options.headers || {};
+        if (auth?.token) {
+          headers.Authorization = `Bearer ${auth.token}`;
+        }
+        if (!(options.body instanceof FormData)) {
+          headers["Content-Type"] = "application/json";
+        }
+        const res = await fetch(`${API_BASE}${path}`, {
+          method: options.method || "GET",
+          headers,
+          body: options.body ? (options.body instanceof FormData ? options.body : JSON.stringify(options.body)) : undefined,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || "请求失败");
+        }
+        return res.status === 204 ? null : res.json();
+      }
+
+      function updateUI() {
+        const loggedIn = Boolean(auth);
+        loginSection.classList.toggle("hidden", loggedIn);
+        dashboardSection.classList.toggle("hidden", !loggedIn);
+        createSection.classList.toggle("hidden", !loggedIn || !["customer", "product_manager"].includes(auth?.user?.role));
+        listSection.classList.toggle("hidden", !loggedIn);
+        detailSection.classList.toggle("hidden", !loggedIn || !selectedIssue);
+
+        if (loggedIn) {
+          userNameEl.textContent = auth.user.full_name;
+          userRoleEl.textContent = roleLabels[auth.user.role] ?? auth.user.role;
+          refreshIssues();
+        } else {
+          issueTbody.innerHTML = "";
+          detailContent.innerHTML = "";
+        }
+      }
+
+      async function refreshIssues() {
+        if (!auth) return;
+        try {
+          issues = await api("/issues");
+          renderIssueTable();
+        } catch (err) {
+          console.error(err);
+          alert(`刷新失败：${err.message}`);
+        }
+      }
+
+      function renderIssueTable() {
+        issueTbody.innerHTML = "";
+        issues.forEach((issue) => {
+          const tr = document.createElement("tr");
+          tr.innerHTML = `
+            <td>${issue.id}</td>
+            <td>${issue.problem_description}</td>
+            <td>${statusPill(issue.state)}</td>
+            <td>${new Date(issue.updated_at).toLocaleString()}</td>
+          `;
+          tr.addEventListener("click", () => {
+            selectedIssue = issue;
+            renderDetail();
+          });
+          issueTbody.appendChild(tr);
+        });
+        if (selectedIssue) {
+          const updated = issues.find((i) => i.id === selectedIssue.id);
+          selectedIssue = updated || null;
+          renderDetail();
+        }
+      }
+
+      function renderDetail() {
+        if (!selectedIssue) {
+          detailSection.classList.add("hidden");
+          return;
+        }
+        detailSection.classList.remove("hidden");
+        document.getElementById("detail-title").textContent = `工单 #${selectedIssue.id}`;
+        const issue = selectedIssue;
+
+        let html = `
+          <p><strong>描述：</strong>${issue.problem_description}</p>
+          <p><strong>发生时间：</strong>${new Date(issue.occurred_at).toLocaleString()}</p>
+          <p><strong>地点：</strong>${issue.location}</p>
+          <p><strong>状态：</strong>${statusPill(issue.state)}</p>
+          <hr/>
+          <h4>开发记录</h4>
+          <p><strong>分析：</strong>${issue.developer_analysis ?? "—"}</p>
+          <p><strong>方案：</strong>${issue.developer_solution ?? "—"}</p>
+          <p><strong>结论：</strong>${issue.developer_decision ?? "—"}</p>
+          <hr/>
+          <h4>流转历史</h4>
+          <div class="history">
+            ${issue.history
+              .map(
+                (h) => `<div class="history-item">
+                    <div>${new Date(h.timestamp).toLocaleString()} - ${h.action}</div>
+                    ${h.notes ? `<div class="muted">${h.notes}</div>` : ""}
+                  </div>`
+              )
+              .join("")}
+          </div>
+        `;
+
+        if (auth.user.role === "developer" && ["pending_developer", "returned"].includes(issue.state)) {
+          html += `
+            <hr/>
+            <h4>开发审批</h4>
+            <form id="decision-form">
+              <label>分析<textarea name="analysis" required>${issue.developer_analysis ?? ""}</textarea></label>
+              <label>解决方案<textarea name="solution" required>${issue.developer_solution ?? ""}</textarea></label>
+              <div class="inline">
+                <button type="submit" data-decision="approve">通过</button>
+                <button type="button" id="reject-btn" style="background:#ef4444">驳回</button>
+              </div>
+            </form>
+          `;
+        }
+
+        if (["draft", "returned"].includes(issue.state) && issue.creator_id === auth.user.id) {
+          html += `
+            <hr/>
+            <h4>修改并重新提交</h4>
+            <form id="update-form">
+              <label>问题描述<textarea name="problem_description">${issue.problem_description}</textarea></label>
+              <label>发生时间<input type="datetime-local" name="occurred_at" value="${issue.occurred_at.slice(0,16)}" /></label>
+              <label>发生地点<input name="location" value="${issue.location}" /></label>
+              <label style="flex-direction:row; align-items:center; gap:0.5rem;">
+                <input type="checkbox" name="resubmit" checked /> 重新提交到开发
+              </label>
+              <button type="submit">更新</button>
+            </form>
+          `;
+        }
+
+        detailContent.innerHTML = html;
+
+        const decisionForm = document.getElementById("decision-form");
+        if (decisionForm) {
+          decisionForm.addEventListener("submit", (evt) => handleDecision(evt, "approve"));
+          document.getElementById("reject-btn").addEventListener("click", (evt) => handleDecision(evt, "disapprove"));
+        }
+        const updateForm = document.getElementById("update-form");
+        if (updateForm) {
+          updateForm.addEventListener("submit", handleUpdate);
+        }
+      }
+
+      async function handleDecision(evt, decision) {
+        evt.preventDefault();
+        const form = evt.target.closest("form");
+        const data = Object.fromEntries(new FormData(form));
+        try {
+          const updated = await api(`/issues/${selectedIssue.id}/decision`, {
+            method: "POST",
+            body: {
+              analysis: data.analysis,
+              solution: data.solution,
+              decision,
+            },
+          });
+          selectedIssue = updated;
+          await refreshIssues();
+        } catch (err) {
+          alert(`审批失败：${err.message}`);
+        }
+      }
+
+      async function handleUpdate(evt) {
+        evt.preventDefault();
+        const data = Object.fromEntries(new FormData(evt.target));
+        try {
+          const updated = await api(`/issues/${selectedIssue.id}`, {
+            method: "PUT",
+            body: {
+              problem_description: data.problem_description,
+              occurred_at: data.occurred_at ? new Date(data.occurred_at).toISOString() : undefined,
+              location: data.location,
+              resubmit: Boolean(data.resubmit),
+            },
+          });
+          selectedIssue = updated;
+          await refreshIssues();
+        } catch (err) {
+          alert(`更新失败：${err.message}`);
+        }
+      }
+
+      loginForm.addEventListener("submit", async (evt) => {
+        evt.preventDefault();
+        const formData = Object.fromEntries(new FormData(loginForm));
+        try {
+          const res = await api("/auth/login", {
+            method: "POST",
+            body: formData,
+          });
+          setAuth({ token: res.access_token, user: res.user });
+        } catch (err) {
+          alert(`登录失败：${err.message}`);
+        }
+      });
+
+      createForm.addEventListener("submit", async (evt) => {
+        evt.preventDefault();
+        const data = Object.fromEntries(new FormData(createForm));
+        try {
+          await api("/issues", {
+            method: "POST",
+            body: {
+              problem_description: data.problem_description,
+              occurred_at: new Date(data.occurred_at).toISOString(),
+              location: data.location,
+            },
+          });
+          createForm.reset();
+          await refreshIssues();
+        } catch (err) {
+          alert(`创建失败：${err.message}`);
+        }
+      });
+
+      refreshBtn.addEventListener("click", refreshIssues);
+      logoutBtn.addEventListener("click", () => setAuth(null));
+
+      updateUI();
+    </script>
+  </body>
+</html>
+
