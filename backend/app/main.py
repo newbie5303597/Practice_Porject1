@@ -8,12 +8,13 @@ from fastapi import Depends, FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from .auth import authenticate_user, create_access_token, get_current_user, require_roles, seed_initial_users
+from .auth import seed_initial_users, authenticate_user, create_access_token, get_current_user, require_roles
 from .config import get_settings
-from .database import Base, engine, get_db
+from .database import engine, Base, get_db
 from .entities import IssueORM
-from .models import IssueState, Role, LoginRequest, TokenResponse, IssueCreateRequest, IssueUpdateRequest, DeveloperDecisionRequest, IssueResponse
-from .storage import append_history, create_issue, get_issue, issue_to_dict, list_issues_for_user, save_issue
+from .models import TokenResponse, LoginRequest, IssueResponse, IssueCreateRequest, Role, IssueUpdateRequest, \
+    IssueState, DeveloperDecisionRequest
+from .storage import create_issue, issue_to_dict, list_issues_for_user, get_issue, append_history, save_issue
 
 settings = get_settings()
 
@@ -139,7 +140,7 @@ def update_issue(
 def developer_decision(
     issue_id: int,
     payload: DeveloperDecisionRequest,
-    current_user: dict = Depends(require_roles(Role.DEVELOPER)),
+    current_user: dict = Depends(require_roles(Role.developer)),
     db: Session = Depends(get_db),
 ) -> IssueResponse:
     """开发审批接口：通过/驳回工单。"""

@@ -39,8 +39,8 @@ def seed_initial_users() -> None:
     """
     default_users = [
         ("pm_lead", "Product Manager", Role.PRODUCT_MANAGER, "pm123456"),
-        ("dev_master", "Lead Developer", Role.DEVELOPER, "dev123456"),
-        ("customer_zero", "Customer One", Role.CUSTOMER, "cust123456"),
+        ("dev_master", "Lead Developer", Role.developer, "dev123456"),
+        ("customer_zero", "Customer One", Role.customer, "cust123456"),
     ]
     with session_scope() as session:
         existing = session.execute(select(UserORM)).scalars().all()
