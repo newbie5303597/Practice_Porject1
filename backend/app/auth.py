@@ -10,10 +10,10 @@ from sqlalchemy import select
 from sqlalchemy.testing.pickleable import User
 from starlette import status
 
-from backend.app.config import get_settings
-from backend.app.database import session_scope, SessionLocal
-from backend.app.entities import UserORM
-from backend.app.models import Role
+from .config import get_settings
+from .database import session_scope, SessionLocal
+from .entities import UserORM
+from .models import Role
 
 settings = get_settings()
 
@@ -81,7 +81,7 @@ def authenticate_user(username: str, password: str) -> Optional[dict]:
 def create_access_token(*, subject: int, role: Role, expires_delta: Optional[timedelta] = None) -> str:
     """创建 JWT 访问令牌。"""
     expire = datetime.utcnow() + (
-        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
+        expires_delta or timedelta(minutes=settings.access_token_expire_min)
     )
     to_encode = {"sub": str(subject), "role": role.value, "exp": expire}
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)

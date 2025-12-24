@@ -5,8 +5,8 @@ from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, Enum, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 
-from backend.app.database import Base
-from backend.app.models import Role, IssueState
+from .database import Base
+from .models import Role, IssueState
 
 
 class UserORM(Base):
