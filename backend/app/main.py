@@ -171,7 +171,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "backend.app.main:app",
+        "app.main:app",
         host=settings.host,
         port=settings.port,
         reload=settings.reload,
